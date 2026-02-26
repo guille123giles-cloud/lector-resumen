@@ -158,13 +158,20 @@ with col_boton:
                 
                 asyncio.run(generar_audio_largo(texto_final, archivo_audio, velocidad_elegida, voz_elegida))
 
-                with open(archivo_audio, "rb") as file:
+                    with open(archivo_audio, "rb") as file:
                     audio_bytes = file.read()
                     
-                    # Le pasamos los bytes puros al reproductor web
-                    st.audio(audio_bytes, format="audio/mp3")
+                    # --- REPRODUCTOR HTML (A prueba de Safari/iPhone) ---
+                    audio_base64 = base64.b64encode(audio_bytes).decode()
+                    audio_html = f"""
+                        <audio controls style="width: 100%; margin-bottom: 20px;">
+                            <source src="data:audio/mpeg;base64,{audio_base64}" type="audio/mpeg">
+                            Tu navegador no soporta el elemento de audio.
+                        </audio>
+                    """
+                    st.markdown(audio_html, unsafe_allow_html=True)
+                    # ----------------------------------------------------
                     
-                    # Le pasamos los mismos bytes al botón de descarga
                     st.download_button(
                         label=f"⬇️ Descargar MP3",
                         data=audio_bytes,
@@ -176,4 +183,5 @@ with col_boton:
             except Exception as e:
 
                 st.error(f"Hubo un error al generar el audio: {e}")
+
 
