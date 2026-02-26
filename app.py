@@ -18,10 +18,14 @@ st.set_page_config(page_title="Lector IA", page_icon="🎧", layout="wide")
 # --- DEDICATORIA ---
 st.markdown("<p style='text-align: center; font-size: 14px; font-style: italic; color: #e0c3fc;'>Para la más linda del mundo, Pili ❤️</p>", unsafe_allow_html=True)
 
-# --- CONFIGURACIÓN DE TESSERACT MULTIPLATAFORMA ---
+# --- CONFIGURACIÓN DE TESSERACT (ARREGLO PARA NUBE) ---
 if platform.system() == "Windows":
-    # Cambiá esta ruta si instalaste Tesseract en otro lugar en tu PC
+    # Esto solo corre en tu compu
     pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+else:
+    # Esto corre en la nube (Streamlit Cloud usa Linux)
+    # No necesita ruta porque se instala en el PATH del sistema
+    pytesseract.pytesseract.tesseract_cmd = 'tesseract'
 
 # --- 1. FUNCIONES PARA EXTRAER TEXTO ---
 def extraer_texto_pdf(archivo):
@@ -48,7 +52,8 @@ def extraer_texto_pptx(archivo):
 
 def extraer_texto_imagen(archivo):
     imagen = Image.open(archivo)
-    # En la nube usa 'spa' instalado vía packages.txt
+    # Redimensionamos un poco para que no pese tanto en el servidor
+    imagen.thumbnail((2000, 2000))
     return pytesseract.image_to_string(imagen, lang='spa')
 
 # --- FUNCIÓN ASÍNCRONA PARA GENERAR AUDIO ---
@@ -90,15 +95,18 @@ with col_izq:
         archivo_subido = st.file_uploader("PDF, Word, PPT o Foto", 
                                           type=["pdf", "docx", "pptx", "png", "jpg", "jpeg"])
         if archivo_subido:
-            if archivo_subido.name.endswith(".pdf"):
+            if archivo_subido.name.lower().endswith(".pdf"):
                 texto_final = extraer_texto_pdf(archivo_subido)
-            elif archivo_subido.name.endswith(".docx"):
+            elif archivo_subido.name.lower().endswith(".docx"):
                 texto_final = extraer_texto_word(archivo_subido)
-            elif archivo_subido.name.endswith(".pptx"):
+            elif archivo_subido.name.lower().endswith(".pptx"):
                 texto_final = extraer_texto_pptx(archivo_subido)
-            elif archivo_subido.name.endswith((".png", ".jpg", ".jpeg")):
-                texto_final = extraer_texto_imagen(archivo_subido)
-                st.image(archivo_subido, caption="Imagen cargada", use_container_width=True)
+            elif archivo_subido.name.lower().endswith((".png", ".jpg", ".jpeg")):
+                try:
+                    texto_final = extraer_texto_imagen(archivo_subido)
+                    st.image(archivo_subido, caption="Imagen cargada", use_container_width=True)
+                except Exception as e:
+                    st.error("Error al leer la foto. Asegurate que sea nítida.")
             
             st.success("¡Contenido leído!")
             with st.expander("Editar texto extraído"):
@@ -108,8 +116,7 @@ with col_izq:
 
 with col_der:
     st.subheader("⚙️ 2. Ajustes")
-    with st.expander("Ajustes de Voz y Velocidad", expanded=True):
-        st.markdown("**🗣️ Voz**")
+    with st.expander("Voz y Velocidad", expanded=True):
         voces = {
             "🇦🇷 Tomás (Arg)": "es-AR-TomasNeural",
             "🇦🇷 Elena (Arg)": "es-AR-ElenaNeural",
@@ -119,7 +126,6 @@ with col_der:
         voz_elegida = voces[st.radio("Elegí acento:", list(voces.keys()))]
         
         st.divider()
-        st.markdown("**⚡ Velocidad**")
         velocidades = {
             "Muy Lento (0.5x)": "-50%",
             "Lento (0.75x)": "-25%",
@@ -144,7 +150,6 @@ with col_btn:
             
             with open(archivo_audio, "rb") as f:
                 audio_bytes = f.read()
-                # Reproductor compatible con iPhone
                 audio_b64 = base64.b64encode(audio_bytes).decode()
                 st.markdown(f'<audio controls style="width: 100%;"><source src="data:audio/mpeg;base64,{audio_b64}" type="audio/mpeg"></audio>', unsafe_allow_html=True)
                 
