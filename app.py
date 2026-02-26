@@ -51,10 +51,16 @@ def extraer_texto_pptx(archivo):
     return texto
 
 def extraer_texto_imagen(archivo):
-    imagen = Image.open(archivo)
-    # Redimensionamos un poco para que no pese tanto en el servidor
-    imagen.thumbnail((2000, 2000))
-    return pytesseract.image_to_string(imagen, lang='spa')
+    try:
+        imagen = Image.open(archivo)
+        # Convertimos a escala de grises para que a la IA le sea más fácil leer
+        imagen = imagen.convert('L') 
+        # Forzamos el uso de tesseract sin ruta fija (esto es clave en Linux/Nube)
+        texto = pytesseract.image_to_string(imagen, lang='spa')
+        return texto
+    except Exception as e:
+        # Esto nos va a decir en la pantalla exactamente qué le duele a la IA
+        return f"Error técnico del motor: {str(e)}"
 
 # --- FUNCIÓN ASÍNCRONA PARA GENERAR AUDIO ---
 async def generar_audio_largo(texto, ruta_salida, velocidad_tts, voz_tts):
@@ -156,3 +162,4 @@ with col_btn:
                 st.download_button("⬇️ Descargar MP3", data=audio_bytes, file_name="resumen.mp3", mime="audio/mp3", use_container_width=True)
         except Exception as e:
             st.error(f"Error: {e}")
+
