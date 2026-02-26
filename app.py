@@ -1,0 +1,172 @@
+import streamlit as st
+import PyPDF2
+import docx
+import pptx
+import tempfile
+import asyncio
+import edge_tts
+import pytesseract
+from PIL import Image
+import textwrap
+import os
+import platform
+
+# --- 0. CONFIGURACIÓN DE LA PÁGINA ---
+# Esto hace que la app use todo el ancho del monitor
+st.set_page_config(page_title="Lector IA", page_icon="🎧", layout="wide")
+
+# --- DEDICATORIA ESPECIAL ---
+# Usamos HTML para centrarlo, ponerlo en cursiva (italic) y darle color
+st.markdown("<p style='text-align: center; font-size: 14px; font-style: italic; color: #e0c3fc;'>Para la más linda del mundo, Pili ❤️</p>", unsafe_allow_html=True)
+
+# --- CONFIGURACIÓN DE TESSERACT MULTIPLATAFORMA ---
+if platform.system() == "Windows":
+    pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
+
+# --- 1. FUNCIONES PARA EXTRAER TEXTO ---
+def extraer_texto_pdf(archivo):
+    lector = PyPDF2.PdfReader(archivo)
+    texto = ""
+    for pagina in lector.pages:
+        if pagina.extract_text():
+            texto += pagina.extract_text() + "\n"
+    return texto
+
+def extraer_texto_word(archivo):
+    doc = docx.Document(archivo)
+    return "\n".join([parrafo.text for parrafo in doc.paragraphs])
+
+def extraer_texto_pptx(archivo):
+    presentacion = pptx.Presentation(archivo)
+    texto = ""
+    for diapositiva in presentacion.slides:
+        for forma in diapositiva.shapes:
+            if hasattr(forma, "text"):
+                texto += forma.text + "\n"
+        texto += "\n"
+    return texto
+
+def extraer_texto_imagen(archivo):
+    imagen = Image.open(archivo)
+    return pytesseract.image_to_string(imagen, lang='spa')
+
+# --- FUNCIÓN ASÍNCRONA PARA GENERAR AUDIO ---
+async def generar_audio_largo(texto, ruta_salida, velocidad_tts, voz_tts):
+    fragmentos = textwrap.wrap(texto, width=3000, replace_whitespace=False)
+    barra_progreso = st.progress(0)
+    texto_estado = st.empty()
+    archivos_temporales = []
+    
+    for i, fragmento in enumerate(fragmentos):
+        texto_estado.text(f"Procesando parte {i+1} de {len(fragmentos)}...")
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
+            temp_path = fp.name
+            archivos_temporales.append(temp_path)
+        
+        comunicador = edge_tts.Communicate(fragmento, voz_tts, rate=velocidad_tts)
+        await comunicador.save(temp_path)
+        barra_progreso.progress((i + 1) / len(fragmentos))
+        
+    texto_estado.text("¡Uniendo el audio final!")
+    with open(ruta_salida, 'wb') as archivo_final:
+        for temp_path in archivos_temporales:
+            with open(temp_path, 'rb') as f:
+                archivo_final.write(f.read())
+            os.remove(temp_path) 
+    texto_estado.text("¡Audio listo!")
+
+# --- 2. INTERFAZ VISUAL MEJORADA (UI/UX) ---
+
+st.title("🎧 Lector de Resúmenes IA")
+st.divider()
+
+# Creamos dos columnas: la izquierda más grande (archivos) y la derecha más chica (ajustes)
+col_izq, col_der = st.columns([2, 1], gap="large")
+
+texto_final = ""
+
+with col_izq:
+    st.subheader("📄 1. Cargá tu material")
+    opcion = st.radio("¿Qué vas a usar?", ("Subir Archivo", "Pegar Texto"), horizontal=True)
+
+    if opcion == "Subir Archivo":
+        archivo_subido = st.file_uploader("Arrastrá tu PDF, Word, PPT o Foto acá", 
+                                          type=["pdf", "docx", "pptx", "png", "jpg", "jpeg"])
+        
+        if archivo_subido is not None:
+            if archivo_subido.name.endswith(".pdf"):
+                texto_final = extraer_texto_pdf(archivo_subido)
+            elif archivo_subido.name.endswith(".docx"):
+                texto_final = extraer_texto_word(archivo_subido)
+            elif archivo_subido.name.endswith(".pptx"):
+                texto_final = extraer_texto_pptx(archivo_subido)
+            elif archivo_subido.name.endswith((".png", ".jpg", ".jpeg")):
+                texto_final = extraer_texto_imagen(archivo_subido)
+                st.image(archivo_subido, caption="Imagen cargada", use_container_width=True)
+                
+            st.success("¡Archivo procesado!")
+            with st.expander("Revisar/Editar texto extraído"):
+                texto_final = st.text_area("Podés corregir el texto acá:", value=texto_final, height=150)
+
+    elif opcion == "Pegar Texto":
+        texto_final = st.text_area("Pegá tu resumen acá:", height=250)
+
+with col_der:
+    st.subheader("⚙️ 2. Ajustes de Audio")
+    
+    # st.container agrupa visualmente las opciones con un borde sutil
+    with st.container(border=True):
+        st.markdown("**🗣️ Voz del Lector**")
+        opciones_voces = {
+            "🇦🇷 Tomás (Argentina)": "es-AR-TomasNeural",
+            "🇦🇷 Elena (Argentina)": "es-AR-ElenaNeural",
+            "🇪🇸 Álvaro (España)": "es-ES-AlvaroNeural",
+            "🇲🇽 Dalia (México)": "es-MX-DaliaNeural",
+            "🇨🇴 Gonzalo (Colombia)": "es-CO-GonzaloNeural"
+        }
+        seleccion_voz = st.radio("Voz:", list(opciones_voces.keys()), label_visibility="collapsed")
+        voz_elegida = opciones_voces[seleccion_voz]
+        
+        st.divider()
+        
+        st.markdown("**⚡ Velocidad**")
+        opciones_velocidad = {
+            "Lento (0.75x)": "-25%",
+            "Normal (1x)": "+0%",
+            "Rápido (1.25x)": "+25%",
+            "Modo Repaso (1.5x)": "+50%",
+            "Modo Turbo (2.0x)": "+100%"
+        }
+        # index=1 hace que arranque en "Normal (1x)" por defecto
+        seleccion_velocidad = st.radio("Velocidad:", list(opciones_velocidad.keys()), index=1, label_visibility="collapsed")
+        velocidad_elegida = opciones_velocidad[seleccion_velocidad]
+
+# --- 3. BOTÓN DE GENERACIÓN Y DESCARGA ---
+st.divider()
+
+# Centramos el botón grande abajo de todo
+_, col_boton, _ = st.columns([1, 2, 1])
+
+with col_boton:
+    if texto_final:
+        # use_container_width=True hace que el botón sea grande y llamativo
+        if st.button("🔊 GENERAR AUDIO AHORA", use_container_width=True):
+            try:
+                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
+                    archivo_audio = fp.name
+                
+                asyncio.run(generar_audio_largo(texto_final, archivo_audio, velocidad_elegida, voz_elegida))
+                    
+                st.audio(archivo_audio, format="audio/mp3")
+                
+                with open(archivo_audio, "rb") as file:
+                    st.download_button(
+                        label=f"⬇️ Descargar MP3",
+                        data=file,
+                        file_name="mi_resumen_pro.mp3",
+                        mime="audio/mp3",
+                        use_container_width=True
+                    )
+                    
+            except Exception as e:
+                st.error(f"Hubo un error al generar el audio: {e}")
