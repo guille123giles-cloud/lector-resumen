@@ -1,3 +1,4 @@
+import base64
 import streamlit as st
 import PyPDF2
 import docx
@@ -175,3 +176,4 @@ with col_boton:
             except Exception as e:
 
                 st.error(f"Hubo un error al generar el audio: {e}")
+
