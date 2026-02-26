@@ -1,4 +1,3 @@
-import base64
 import streamlit as st
 import PyPDF2
 import docx
@@ -11,17 +10,17 @@ from PIL import Image
 import textwrap
 import os
 import platform
+import base64
 
 # --- 0. CONFIGURACIÓN DE LA PÁGINA ---
-# Esto hace que la app use todo el ancho del monitor
 st.set_page_config(page_title="Lector IA", page_icon="🎧", layout="wide")
 
-# --- DEDICATORIA ESPECIAL ---
-# Usamos HTML para centrarlo, ponerlo en cursiva (italic) y darle color
+# --- DEDICATORIA ---
 st.markdown("<p style='text-align: center; font-size: 14px; font-style: italic; color: #e0c3fc;'>Para la más linda del mundo, Pili ❤️</p>", unsafe_allow_html=True)
 
 # --- CONFIGURACIÓN DE TESSERACT MULTIPLATAFORMA ---
 if platform.system() == "Windows":
+    # Cambiá esta ruta si instalaste Tesseract en otro lugar en tu PC
     pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 
 # --- 1. FUNCIONES PARA EXTRAER TEXTO ---
@@ -49,6 +48,7 @@ def extraer_texto_pptx(archivo):
 
 def extraer_texto_imagen(archivo):
     imagen = Image.open(archivo)
+    # En la nube usa 'spa' instalado vía packages.txt
     return pytesseract.image_to_string(imagen, lang='spa')
 
 # --- FUNCIÓN ASÍNCRONA PARA GENERAR AUDIO ---
@@ -68,7 +68,6 @@ async def generar_audio_largo(texto, ruta_salida, velocidad_tts, voz_tts):
         await comunicador.save(temp_path)
         barra_progreso.progress((i + 1) / len(fragmentos))
         
-    texto_estado.text("¡Uniendo el audio final!")
     with open(ruta_salida, 'wb') as archivo_final:
         for temp_path in archivos_temporales:
             with open(temp_path, 'rb') as f:
@@ -76,14 +75,11 @@ async def generar_audio_largo(texto, ruta_salida, velocidad_tts, voz_tts):
             os.remove(temp_path) 
     texto_estado.text("¡Audio listo!")
 
-# --- 2. INTERFAZ VISUAL MEJORADA (UI/UX) ---
-
-st.title("🎧 Lector de Resúmenes IA")
+# --- 2. INTERFAZ VISUAL ---
+st.title("🎧 Mi Lector de Resúmenes IA")
 st.divider()
 
-# Creamos dos columnas: la izquierda más grande (archivos) y la derecha más chica (ajustes)
 col_izq, col_der = st.columns([2, 1], gap="large")
-
 texto_final = ""
 
 with col_izq:
@@ -91,10 +87,9 @@ with col_izq:
     opcion = st.radio("¿Qué vas a usar?", ("Subir Archivo", "Pegar Texto"), horizontal=True)
 
     if opcion == "Subir Archivo":
-        archivo_subido = st.file_uploader("Arrastrá tu PDF, Word, PPT o Foto acá", 
+        archivo_subido = st.file_uploader("PDF, Word, PPT o Foto", 
                                           type=["pdf", "docx", "pptx", "png", "jpg", "jpeg"])
-        
-        if archivo_subido is not None:
+        if archivo_subido:
             if archivo_subido.name.endswith(".pdf"):
                 texto_final = extraer_texto_pdf(archivo_subido)
             elif archivo_subido.name.endswith(".docx"):
@@ -104,84 +99,55 @@ with col_izq:
             elif archivo_subido.name.endswith((".png", ".jpg", ".jpeg")):
                 texto_final = extraer_texto_imagen(archivo_subido)
                 st.image(archivo_subido, caption="Imagen cargada", use_container_width=True)
-                
-            st.success("¡Archivo procesado!")
-            with st.expander("Revisar/Editar texto extraído"):
-                texto_final = st.text_area("Podés corregir el texto acá:", value=texto_final, height=150)
-
-    elif opcion == "Pegar Texto":
-        texto_final = st.text_area("Pegá tu resumen acá:", height=250)
+            
+            st.success("¡Contenido leído!")
+            with st.expander("Editar texto extraído"):
+                texto_final = st.text_area("Texto:", value=texto_final, height=200)
+    else:
+        texto_final = st.text_area("Pegá tu resumen acá:", height=300)
 
 with col_der:
-    st.subheader("⚙️ 2. Ajustes de Audio")
-    
-    # st.container agrupa visualmente las opciones con un borde sutil
-    with st.container(border=True):
-        st.markdown("**🗣️ Voz del Lector**")
-        opciones_voces = {
-            "🇦🇷 Tomás (Argentina)": "es-AR-TomasNeural",
-            "🇦🇷 Elena (Argentina)": "es-AR-ElenaNeural",
-            "🇪🇸 Álvaro (España)": "es-ES-AlvaroNeural",
-            "🇲🇽 Dalia (México)": "es-MX-DaliaNeural",
-            "🇨🇴 Gonzalo (Colombia)": "es-CO-GonzaloNeural"
+    st.subheader("⚙️ 2. Ajustes")
+    with st.expander("Ajustes de Voz y Velocidad", expanded=True):
+        st.markdown("**🗣️ Voz**")
+        voces = {
+            "🇦🇷 Tomás (Arg)": "es-AR-TomasNeural",
+            "🇦🇷 Elena (Arg)": "es-AR-ElenaNeural",
+            "🇪🇸 Álvaro (Esp)": "es-ES-AlvaroNeural",
+            "🇲🇽 Dalia (Mex)": "es-MX-DaliaNeural"
         }
-        seleccion_voz = st.radio("Voz:", list(opciones_voces.keys()), label_visibility="collapsed")
-        voz_elegida = opciones_voces[seleccion_voz]
+        voz_elegida = voces[st.radio("Elegí acento:", list(voces.keys()))]
         
         st.divider()
-        
         st.markdown("**⚡ Velocidad**")
-        opciones_velocidad = {
+        velocidades = {
+            "Muy Lento (0.5x)": "-50%",
             "Lento (0.75x)": "-25%",
             "Normal (1x)": "+0%",
             "Rápido (1.25x)": "+25%",
-            "Modo Repaso (1.5x)": "+50%",
-            "Modo Turbo (2.0x)": "+100%"
+            "Repaso (1.5x)": "+50%",
+            "Turbo (2.0x)": "+100%"
         }
-        # index=1 hace que arranque en "Normal (1x)" por defecto
-        seleccion_velocidad = st.radio("Velocidad:", list(opciones_velocidad.keys()), index=1, label_visibility="collapsed")
-        velocidad_elegida = opciones_velocidad[seleccion_velocidad]
+        velocidad_elegida = velocidades[st.radio("Velocidad:", list(velocidades.keys()), index=2)]
 
-# --- 3. BOTÓN DE GENERACIÓN Y DESCARGA ---
+# --- 3. PROCESAMIENTO Y REPRODUCTOR ---
 st.divider()
+_, col_btn, _ = st.columns([1, 2, 1])
 
-# Centramos el botón grande abajo de todo
-_, col_boton, _ = st.columns([1, 2, 1])
-
-with col_boton:
-    if texto_final:
-        # use_container_width=True hace que el botón sea grande y llamativo
-        if st.button("🔊 GENERAR AUDIO AHORA", use_container_width=True):
-            try:
-                with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
-                    archivo_audio = fp.name
+with col_btn:
+    if texto_final and st.button("🔊 GENERAR AUDIO", use_container_width=True):
+        try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as fp:
+                archivo_audio = fp.name
+            
+            asyncio.run(generar_audio_largo(texto_final, archivo_audio, velocidad_elegida, voz_elegida))
+            
+            with open(archivo_audio, "rb") as f:
+                audio_bytes = f.read()
+                # Reproductor compatible con iPhone
+                audio_b64 = base64.b64encode(audio_bytes).decode()
+                st.markdown(f'<audio controls style="width: 100%;"><source src="data:audio/mpeg;base64,{audio_b64}" type="audio/mpeg"></audio>', unsafe_allow_html=True)
                 
-                asyncio.run(generar_audio_largo(texto_final, archivo_audio, velocidad_elegida, voz_elegida))
-
-                    with open(archivo_audio, "rb") as file:
-                    audio_bytes = file.read()
-                    
-                    # --- REPRODUCTOR HTML (A prueba de Safari/iPhone) ---
-                    audio_base64 = base64.b64encode(audio_bytes).decode()
-                    audio_html = f"""
-                        <audio controls style="width: 100%; margin-bottom: 20px;">
-                            <source src="data:audio/mpeg;base64,{audio_base64}" type="audio/mpeg">
-                            Tu navegador no soporta el elemento de audio.
-                        </audio>
-                    """
-                    st.markdown(audio_html, unsafe_allow_html=True)
-                    # ----------------------------------------------------
-                    
-                    st.download_button(
-                        label=f"⬇️ Descargar MP3",
-                        data=audio_bytes,
-                        file_name="mi_resumen_pro.mp3",
-                        mime="audio/mp3",
-                        use_container_width=True
-                    )
-                    
-            except Exception as e:
-
-                st.error(f"Hubo un error al generar el audio: {e}")
-
-
+                st.download_button("⬇️ Descargar MP3", data=audio_bytes, file_name="resumen.mp3", mime="audio/mp3", use_container_width=True)
+        except Exception as e:
+            st.error(f"Error: {e}")
