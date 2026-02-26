@@ -156,17 +156,22 @@ with col_boton:
                     archivo_audio = fp.name
                 
                 asyncio.run(generar_audio_largo(texto_final, archivo_audio, velocidad_elegida, voz_elegida))
-                    
-                st.audio(archivo_audio, format="audio/mp3")
-                
+
                 with open(archivo_audio, "rb") as file:
+                    audio_bytes = file.read()
+                    
+                    # Le pasamos los bytes puros al reproductor web
+                    st.audio(audio_bytes, format="audio/mp3")
+                    
+                    # Le pasamos los mismos bytes al botón de descarga
                     st.download_button(
                         label=f"⬇️ Descargar MP3",
-                        data=file,
+                        data=audio_bytes,
                         file_name="mi_resumen_pro.mp3",
                         mime="audio/mp3",
                         use_container_width=True
                     )
                     
             except Exception as e:
+
                 st.error(f"Hubo un error al generar el audio: {e}")
