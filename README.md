@@ -1,4 +1,4 @@
-# 🎧 Lector IA: OCR & Text-to-Speech Engine
+# Lector IA: OCR & Text-to-Speech Engine
 
 ![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=for-the-badge&logo=Streamlit&logoColor=white)
@@ -8,7 +8,7 @@
 
 ---
 
-## 🚀 Características Principales
+## Características Principales
 
 * **Extracción Multiformato:** Procesa archivos PDF, Word (`.docx`), PowerPoint (`.pptx`) y archivos de imagen.
 * **Motor OCR Integrado:** Digitaliza texto de fotos y capturas (`.jpg`, `.png`, `.jpeg`) utilizando **Tesseract OCR**, optimizado para el idioma español.
@@ -18,7 +18,7 @@
 
 ---
 
-## 🛠️ Stack Tecnológico
+## Stack Tecnológico
 
 * **Frontend & Web App:** [Streamlit](https://streamlit.io/)
 * **OCR (Optical Character Recognition):** [PyTesseract](https://github.com/madmaze/pytesseract)
@@ -27,7 +27,7 @@
 
 ---
 
-## 📦 Instalación y Configuración
+## Instalación y Configuración
 
 Para correr este proyecto de forma local, seguí estos pasos:
 
@@ -53,7 +53,7 @@ Para correr este proyecto de forma local, seguí estos pasos:
 
 ---
 
-## 💡 Modo de Uso
+## Modo de Uso
 
 1.  **Carga de datos:** Seleccioná si querés subir un archivo (PDF, Word, Imagen) o pegar el texto directamente.
 2.  **Configuración:** En la barra lateral (o sección de ajustes), elegí el acento de la voz y la velocidad que prefieras.
