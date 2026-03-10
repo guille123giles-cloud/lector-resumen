@@ -12,22 +12,15 @@ import os
 import platform
 import base64
 
-# --- 0. CONFIGURACIÓN DE LA PÁGINA ---
 st.set_page_config(page_title="Lector IA", page_icon="🎧", layout="wide")
 
-# --- DEDICATORIA ---
 st.markdown("<p style='text-align: center; font-size: 14px; font-style: italic; color: #e0c3fc;'>Para la más linda del mundo, Pili ❤️</p>", unsafe_allow_html=True)
 
-# --- CONFIGURACIÓN DE TESSERACT (ARREGLO PARA NUBE) ---
 if platform.system() == "Windows":
-    # Esto solo corre en tu compu
     pytesseract.pytesseract.tesseract_cmd = r'C:\Program Files\Tesseract-OCR\tesseract.exe'
 else:
-    # Esto corre en la nube (Streamlit Cloud usa Linux)
-    # No necesita ruta porque se instala en el PATH del sistema
     pytesseract.pytesseract.tesseract_cmd = 'tesseract'
 
-# --- 1. FUNCIONES PARA EXTRAER TEXTO ---
 def extraer_texto_pdf(archivo):
     lector = PyPDF2.PdfReader(archivo)
     texto = ""
@@ -53,16 +46,12 @@ def extraer_texto_pptx(archivo):
 def extraer_texto_imagen(archivo):
     try:
         imagen = Image.open(archivo)
-        # Convertimos a escala de grises para que a la IA le sea más fácil leer
         imagen = imagen.convert('L') 
-        # Forzamos el uso de tesseract sin ruta fija (esto es clave en Linux/Nube)
         texto = pytesseract.image_to_string(imagen, lang='spa')
         return texto
     except Exception as e:
-        # Esto nos va a decir en la pantalla exactamente qué le duele a la IA
         return f"Error técnico del motor: {str(e)}"
 
-# --- FUNCIÓN ASÍNCRONA PARA GENERAR AUDIO ---
 async def generar_audio_largo(texto, ruta_salida, velocidad_tts, voz_tts):
     fragmentos = textwrap.wrap(texto, width=3000, replace_whitespace=False)
     barra_progreso = st.progress(0)
@@ -86,7 +75,6 @@ async def generar_audio_largo(texto, ruta_salida, velocidad_tts, voz_tts):
             os.remove(temp_path) 
     texto_estado.text("¡Audio listo!")
 
-# --- 2. INTERFAZ VISUAL ---
 st.title("🎧 Mi Lector de Resúmenes IA")
 st.divider()
 
@@ -142,7 +130,6 @@ with col_der:
         }
         velocidad_elegida = velocidades[st.radio("Velocidad:", list(velocidades.keys()), index=2)]
 
-# --- 3. PROCESAMIENTO Y REPRODUCTOR ---
 st.divider()
 _, col_btn, _ = st.columns([1, 2, 1])
 
@@ -162,5 +149,6 @@ with col_btn:
                 st.download_button("⬇️ Descargar MP3", data=audio_bytes, file_name="resumen.mp3", mime="audio/mp3", use_container_width=True)
         except Exception as e:
             st.error(f"Error: {e}")
+
 
 
